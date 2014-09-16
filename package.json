@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "commoner": "^0.10.0",
-    "esprima-fb": "^4001.3001.0-dev-harmony-fb",
-    "jstransform": "^6.0.1"
+    "esprima-fb": "^6001.1.0-dev-harmony-fb",
+    "jstransform": "^6.2.0"
   },
   "devDependencies": {
     "benchmark": "~1.0.0",
@@ -82,7 +82,7 @@
     "rootDir": "",
     "scriptPreprocessor": "jest/preprocessor.js",
     "setupEnvScriptFile": "jest/environment.js",
-    "modulePathIgnorePatterns": ["/build/", "/node_modules/"],
+    "modulePathIgnorePatterns": ["/build/", "/node_modules/", "/.module-cache/"],
     "testPathIgnorePatterns": ["/build/", "/node_modules/"],
     "unmockedModulePathPatterns": [""]
   }
