@@ -1,19 +1,11 @@
 /**
- * Copyright 2013-2014 Facebook, Inc.
+ * Copyright 2013-2014, Facebook, Inc.
+ * All rights reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * @jsx React.DOM
  * @emails react-core
  */
 
@@ -98,8 +90,8 @@ describe('ReactCompositeComponent', function() {
         console.log(this.getDOMNode());
       },
       render: function() {
-        var component = this.state.component;
-        return component ? <component /> : null;
+        var Component = this.state.component;
+        return Component ? <Component /> : null;
       }
     });
 
@@ -114,7 +106,7 @@ describe('ReactCompositeComponent', function() {
   it('should give context for PropType errors in nested components.', () => {
     // In this test, we're making sure that if a proptype error is found in a
     // component, we give a small hint as to which parent instantiated that
-    // component as per warnings about key usage in ReactDescriptorValidator.
+    // component as per warnings about key usage in ReactElementValidator.
     spyOn(console, 'warn');
     var MyComp = React.createClass({
       propTypes: {
@@ -196,11 +188,11 @@ describe('ReactCompositeComponent', function() {
     var instance1 =
       <TogglingComponent
         firstComponent={null}
-        secondComponent={React.DOM.div}
+        secondComponent={'div'}
       />;
     var instance2 =
       <TogglingComponent
-        firstComponent={React.DOM.div}
+        firstComponent={'div'}
         secondComponent={null}
       />;
 
@@ -223,11 +215,11 @@ describe('ReactCompositeComponent', function() {
       var instance1 =
         <TogglingComponent
           firstComponent={null}
-          secondComponent={React.DOM.script}
+          secondComponent={'script'}
         />;
       var instance2 =
         <TogglingComponent
-          firstComponent={React.DOM.script}
+          firstComponent={'script'}
           secondComponent={null}
         />;
 
@@ -264,13 +256,13 @@ describe('ReactCompositeComponent', function() {
 
       var instance1 =
         <TogglingComponent
-          firstComponent={React.DOM.div}
+          firstComponent={'div'}
           secondComponent={Child}
         />;
       var instance2 =
         <TogglingComponent
           firstComponent={Child}
-          secondComponent={React.DOM.div}
+          secondComponent={'div'}
         />;
 
       expect(function() {
@@ -300,12 +292,12 @@ describe('ReactCompositeComponent', function() {
       }
     });
 
-    var markup = ReactServerRendering.renderComponentToString(<Parent />);
+    var markup = ReactServerRendering.renderToString(<Parent />);
     var container = document.createElement('div');
     container.innerHTML = markup;
 
     spyOn(console, 'warn');
-    React.renderComponent(<Parent />, container);
+    React.render(<Parent />, container);
     expect(console.warn).not.toHaveBeenCalled();
   });
 
@@ -469,13 +461,13 @@ describe('ReactCompositeComponent', function() {
     });
 
     var container = document.createElement('div');
-    var instance = React.renderComponent(
+    var instance = React.render(
       <Component fruit="mango" />,
       container
     );
     expect(instance.props.fruit).toBe('mango');
 
-    React.renderComponent(<Component />, container);
+    React.render(<Component />, container);
     expect(instance.props.fruit).toBe('persimmon');
   });
 
@@ -617,7 +609,7 @@ describe('ReactCompositeComponent', function() {
     var instance = <Component />;
     expect(instance.forceUpdate).not.toBeDefined();
 
-    instance = React.renderComponent(instance, container);
+    instance = React.render(instance, container);
     expect(function() {
       instance.forceUpdate();
     }).not.toThrow();
@@ -877,7 +869,7 @@ describe('ReactCompositeComponent', function() {
       }
     });
 
-    React.renderComponent(<Component />, container);
+    React.render(<Component />, container);
     React.unmountComponentAtNode(container);
     expect(innerUnmounted).toBe(true);
 
@@ -886,7 +878,10 @@ describe('ReactCompositeComponent', function() {
     expect(ReactMount.purgeID.callCount).toBe(4);
   });
 
-  it('should detect valid CompositeComponent classes', function() {
+  it('should warn but detect valid CompositeComponent classes', function() {
+    var warn = console.warn;
+    console.warn = mocks.getMockFunction();
+
     var Component = React.createClass({
       render: function() {
         return <div/>;
@@ -894,9 +889,17 @@ describe('ReactCompositeComponent', function() {
     });
 
     expect(React.isValidClass(Component)).toBe(true);
+
+    expect(console.warn.mock.calls.length).toBe(1);
+    expect(console.warn.mock.calls[0][0]).toContain(
+      'isValidClass is deprecated and will be removed in a future release'
+    );
   });
 
-  it('should detect invalid CompositeComponent classes', function() {
+  it('should warn but detect invalid CompositeComponent classes', function() {
+    var warn = console.warn;
+    console.warn = mocks.getMockFunction();
+
     var FnComponent = function() {
       return false;
     };
@@ -911,6 +914,13 @@ describe('ReactCompositeComponent', function() {
     expect(React.isValidClass(FnComponent)).toBe(false);
     expect(React.isValidClass(NullComponent)).toBe(false);
     expect(React.isValidClass(TrickFnComponent)).toBe(false);
+
+    expect(console.warn.mock.calls.length).toBe(3);
+    console.warn.mock.calls.forEach(function(call) {
+      expect(call[0]).toContain(
+        'isValidClass is deprecated and will be removed in a future release'
+      );
+    });
   });
 
   it('should warn when shouldComponentUpdate() returns undefined', function() {
@@ -1471,6 +1481,27 @@ describe('ReactCompositeComponent', function() {
       'updates from render is not allowed. If necessary, trigger nested ' +
       'updates in componentDidUpdate.'
     );
+  });
+
+  it('gives a helpful error when passing null or undefined', function() {
+    spyOn(console, 'warn');
+    React.createElement(undefined);
+    React.createElement(null);
+    expect(console.warn.calls.length).toBe(2);
+    expect(console.warn.calls[0].args[0]).toBe(
+      'Warning: React.createElement: type should not be null or undefined. ' +
+      'It should be a string (for DOM elements) or a ReactClass (for ' +
+      'composite components).'
+    );
+    expect(console.warn.calls[1].args[0]).toBe(
+      'Warning: React.createElement: type should not be null or undefined. ' +
+      'It should be a string (for DOM elements) or a ReactClass (for ' +
+      'composite components).'
+    );
+    React.createElement('div');
+    expect(console.warn.calls.length).toBe(2);
+
+    expect(() => React.createElement(undefined)).not.toThrow()
   });
 
 });

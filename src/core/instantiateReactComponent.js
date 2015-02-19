@@ -1,17 +1,10 @@
 /**
- * Copyright 2013-2014 Facebook, Inc.
+ * Copyright 2013-2014, Facebook, Inc.
+ * All rights reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  *
  * @providesModule instantiateReactComponent
  * @typechecks static-only
@@ -21,48 +14,47 @@
 
 var warning = require('warning');
 
-var ReactDescriptor = require('ReactDescriptor');
-var ReactLegacyDescriptor = require('ReactLegacyDescriptor');
+var ReactElement = require('ReactElement');
+var ReactLegacyElement = require('ReactLegacyElement');
+var ReactNativeComponent = require('ReactNativeComponent');
 var ReactEmptyComponent = require('ReactEmptyComponent');
 
 /**
- * Given a `componentDescriptor` create an instance that will actually be
- * mounted.
+ * Given an `element` create an instance that will actually be mounted.
  *
- * @param {object} descriptor
- * @return {object} A new instance of componentDescriptor's constructor.
+ * @param {object} element
+ * @param {*} parentCompositeType The composite type that resolved this.
+ * @return {object} A new instance of the element's constructor.
  * @protected
  */
-function instantiateReactComponent(descriptor) {
+function instantiateReactComponent(element, parentCompositeType) {
   var instance;
 
   if (__DEV__) {
     warning(
-      descriptor && (typeof descriptor.type === 'function' ||
-                     typeof descriptor.type === 'string'),
+      element && (typeof element.type === 'function' ||
+                     typeof element.type === 'string'),
       'Only functions or strings can be mounted as React components.'
-      // Not really strings yet, but as soon as I solve the cyclic dep, they
-      // will be allowed here.
     );
 
     // Resolve mock instances
-    if (descriptor.type._mockedReactClassConstructor) {
+    if (element.type._mockedReactClassConstructor) {
       // If this is a mocked class, we treat the legacy factory as if it was the
       // class constructor for future proofing unit tests. Because this might
       // be mocked as a legacy factory, we ignore any warnings triggerd by
       // this temporary hack.
-      ReactLegacyDescriptor._isLegacyCallWarningEnabled = false;
+      ReactLegacyElement._isLegacyCallWarningEnabled = false;
       try {
-        instance = new descriptor.type._mockedReactClassConstructor(
-          descriptor.props
+        instance = new element.type._mockedReactClassConstructor(
+          element.props
         );
       } finally {
-        ReactLegacyDescriptor._isLegacyCallWarningEnabled = true;
+        ReactLegacyElement._isLegacyCallWarningEnabled = true;
       }
 
       // If the mock implementation was a legacy factory, then it returns a
-      // descriptor. We need to turn this into a real component instance.
-      if (ReactDescriptor.isValidDescriptor(instance)) {
+      // element. We need to turn this into a real component instance.
+      if (ReactElement.isValidElement(instance)) {
         instance = new instance.type(instance.props);
       }
 
@@ -71,25 +63,33 @@ function instantiateReactComponent(descriptor) {
         // For auto-mocked factories, the prototype isn't shimmed and therefore
         // there is no render function on the instance. We replace the whole
         // component with an empty component instance instead.
-        descriptor = ReactEmptyComponent.getEmptyComponent();
-        instance = new descriptor.type(descriptor.props);
-        instance.construct(descriptor);
+        element = ReactEmptyComponent.getEmptyComponent();
+      } else {
+        if (render._isMockFunction && !render._getMockImplementation()) {
+          // Auto-mocked components may have a prototype with a mocked render
+          // function. For those, we'll need to mock the result of the render
+          // since we consider undefined to be invalid results from render.
+          render.mockImplementation(
+            ReactEmptyComponent.getEmptyComponent
+          );
+        }
+        instance.construct(element);
         return instance;
-      } else if (render._isMockFunction && !render._getMockImplementation()) {
-        // Auto-mocked components may have a prototype with a mocked render
-        // function. For those, we'll need to mock the result of the render
-        // since we consider undefined to be invalid results from render.
-        render.mockImplementation(
-          ReactEmptyComponent.getEmptyComponent
-        );
       }
-      instance.construct(descriptor);
-      return instance;
     }
   }
 
-  // Normal case for non-mocks
-  instance = new descriptor.type(descriptor.props);
+  // Special case string values
+  if (typeof element.type === 'string') {
+    instance = ReactNativeComponent.createInstanceForTag(
+      element.type,
+      element.props,
+      parentCompositeType
+    );
+  } else {
+    // Normal case for non-mocks and non-strings
+    instance = new element.type(element.props);
+  }
 
   if (__DEV__) {
     warning(
@@ -102,7 +102,7 @@ function instantiateReactComponent(descriptor) {
 
   // This actually sets up the internal instance. This will become decoupled
   // from the public instance in a future diff.
-  instance.construct(descriptor);
+  instance.construct(element);
 
   return instance;
 }
